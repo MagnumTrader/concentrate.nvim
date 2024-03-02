@@ -122,6 +122,7 @@ M.remove_all_folds = function ()
 end
 
 vim.keymap.set({ "n", "v", "x" }, "te", M.remove_all_folds)
+
 vim.keymap.set("n", "rel", function()
 
     vc(":w")
