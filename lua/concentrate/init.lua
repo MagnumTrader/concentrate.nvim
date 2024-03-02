@@ -4,7 +4,6 @@ local getpos = vim.fn.getpos
 
 local M = {}
 
--- TODO let the user change these in require("concentrate").setup({})
 M.fold_marks = {
     { "j", "k" },
     { "h", "l" },
@@ -14,6 +13,7 @@ M.fold_marks = {
 }
 M.CURRENT_FOLD = 0
 
+-- TODO other settings
 M.setup = function (settings)
     -- TODO error checking for duplicate marks
     if settings.fold_marks then
@@ -22,11 +22,9 @@ M.setup = function (settings)
 end
 
 local function unfold_row(pos)
-
     if vim.fn.foldlevel(pos[1]) == 0 then
         return;
     end
-
     va.nvim_win_set_cursor(0, pos)
     vc("norm zd")
 end
@@ -116,7 +114,6 @@ M.remove_all_folds = function ()
         M.remove_last_fold()
     end
 end
-
 
 -- dev only
 local plenary = require("plenary.reload")
