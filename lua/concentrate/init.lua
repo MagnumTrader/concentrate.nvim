@@ -1,18 +1,11 @@
--- can have multiple folds!
--- which means that we need to clean up the rows,
---
--- BUT we can have kind of a stack of folds, so we can "dig deeper" in our coding
---
-local plenary = require("plenary.reload")
-
 local vc = vim.cmd
 local va = vim.api
-
 local getpos = vim.fn.getpos
+
 local M = {}
 
--- TODO let the user change these
-M.folds = {
+-- TODO let the user change these in require("concentrate").setup({})
+M.fold_marks = {
     { "j", "k" },
     { "h", "l" },
     { "u", "i" },
@@ -20,6 +13,13 @@ M.folds = {
     { "n", "m" },
 }
 M.CURRENT_FOLD = 0
+
+M.setup = function (settings)
+    -- TODO error checking for duplicate marks
+    if settings.fold_marks then
+        M.fold_marks = settings.fold_marks
+    end
+end
 
 local function unfold_row(pos)
 
@@ -33,13 +33,13 @@ end
 
 local function next_marks()
 
-    if M.CURRENT_FOLD >= vim.fn.len(M.folds) then
+    if M.CURRENT_FOLD >= vim.fn.len(M.fold_marks) then
         print("no more marks! if you want more, extend the number of marks in your setup()")
         return;
     end
 
     M.CURRENT_FOLD = M.CURRENT_FOLD + 1
-    local marks = M.folds[M.CURRENT_FOLD]
+    local marks = M.fold_marks[M.CURRENT_FOLD]
 
     return marks
 end
@@ -51,7 +51,7 @@ local function get_current_and_decrement_fold_marks()
         return;
     end
 
-    local marks = M.folds[M.CURRENT_FOLD]
+    local marks = M.fold_marks[M.CURRENT_FOLD]
     M.CURRENT_FOLD = M.CURRENT_FOLD - 1
 
     return marks
@@ -78,8 +78,8 @@ local function fold_lines(top_row, bot_row)
     va.nvim_buf_set_mark(0, marks[2], bot_row, 0, {})
 end
 
-vim.keymap.set({ "n", "v", "x" }, "<leader>te", function()
 
+M.new_fold =  function()
     local selection_start = vim.fn.max({1, vim.fn.getpos("v")[2] - 1})
     local selection_end = vim.fn.min({va.nvim_win_get_cursor(0)[1] + 1, va.nvim_buf_line_count(0)})
 
@@ -87,8 +87,7 @@ vim.keymap.set({ "n", "v", "x" }, "<leader>te", function()
 
     local esc = vim.api.nvim_replace_termcodes('<esc>', true, false, true)
     vim.api.nvim_feedkeys(esc, 'x', false)
-
-end)
+end
 
 M.remove_last_fold = function ()
 
@@ -112,17 +111,15 @@ M.remove_last_fold = function ()
     vc("norm zz")
 end
 
-
-vim.keymap.set({ "n", "v", "x" }, "<leader>tr", M.remove_last_fold)
-
 M.remove_all_folds = function ()
     for _=M.CURRENT_FOLD, 0, -1 do
         M.remove_last_fold()
     end
 end
 
-vim.keymap.set({ "n", "v", "x" }, "te", M.remove_all_folds)
 
+-- dev only
+local plenary = require("plenary.reload")
 vim.keymap.set("n", "rel", function()
 
     vc(":w")
@@ -131,5 +128,10 @@ vim.keymap.set("n", "rel", function()
 
     return require("concentrate")
 end)
+
+-- bindings for dev
+vim.keymap.set({ "n", "v", "x" }, "te", M.new_fold)
+vim.keymap.set({ "n", "v", "x" }, "tr", M.remove_last_fold)
+vim.keymap.set({ "n", "v", "x" }, "<leader>tr", M.remove_all_folds)
 
 return M
