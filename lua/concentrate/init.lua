@@ -1,5 +1,5 @@
 -- can have multiple folds!
--- which means that we need to clean up the rows, 
+-- which means that we need to clean up the rows,
 --
 -- BUT we can have kind of a stack of folds, so we can "dig deeper" in our coding
 --
@@ -8,23 +8,33 @@ local plenary = require("plenary.reload")
 local vc = vim.cmd
 local va = vim.api
 
+local getpos = vim.fn.getpos
 local M = {}
 
--- TODO check for fold conflicts
+-- TODO let the user change these
 M.folds = {
-        {"j", "k"},
-        {"h", "l"},
-        {"u", "o"},
+    { "j", "k" },
+    { "h", "l" },
+    { "u", "i" },
+    { "y", "o" },
+    { "n", "m" },
 }
 M.CURRENT_FOLD = 0
 
 local function unfold_row(pos)
+
+    if vim.fn.foldlevel(pos[1]) == 0 then
+        return;
+    end
+
     va.nvim_win_set_cursor(0, pos)
     vc("norm zd")
 end
+
 local function next_marks()
+
     if M.CURRENT_FOLD >= vim.fn.len(M.folds) then
-        print("no more marks! extend number of marks in your setup()")
+        print("no more marks! if you want more, extend the number of marks in your setup()")
         return;
     end
 
@@ -34,9 +44,10 @@ local function next_marks()
     return marks
 end
 
-local function prev_marks()
+local function get_current_and_decrement_fold_marks()
+
     if M.CURRENT_FOLD < 1 then
-        print("at first mark!")
+        print("No folds!")
         return;
     end
 
@@ -46,27 +57,11 @@ local function prev_marks()
     return marks
 end
 
-local function fold_top(line)
-
-    if line < 1 then
-        return;
-    end
-
-    va.nvim_win_set_cursor(0, {line, 0})
-    vc("norm zfgg")
+local function fold(from, to)
+    vim.cmd(from .. ", " .. to .. " fo")
 end
 
-local function fold_bottom(line)
-    va.nvim_win_set_cursor(0, {line, 0})
-    vc("norm zfG")
-end
-
--- better to use both fold functions and just pass lines to fold from
-local function single_line_fold()
-    -- get current cursor position
-    local cur_pos = va.nvim_win_get_cursor(0)
-    local bot_fold = cur_pos[1] + 1
-    local top_fold = cur_pos[1] - 1
+local function fold_lines(top_row, bot_row)
     -- get next mark names
     local marks = next_marks()
 
@@ -74,96 +69,65 @@ local function single_line_fold()
         return;
     end
 
-    if top_fold >= 1 then
-        fold_top(top_fold)
-        -- set mark
-        vim.api.nvim_buf_set_mark(0, marks[1], top_fold, 0, {})
-    end
-
-    fold_bottom(bot_fold)
+    fold("0", top_row)
     -- set mark
-    va.nvim_buf_set_mark(0, marks[2], bot_fold, 0, {})
-    va.nvim_win_set_cursor(0, cur_pos)
+    vim.api.nvim_buf_set_mark(0, marks[1], top_row, 0, {})
+
+    fold(bot_row, "$")
+    -- set mark
+    va.nvim_buf_set_mark(0, marks[2], bot_row, 0, {})
 end
 
-vim.keymap.set("n", "<leader>te", function ()
-    single_line_fold()
+vim.keymap.set({ "n", "v", "x" }, "<leader>te", function()
+
+    local selection_start = vim.fn.max({1, vim.fn.getpos("v")[2] - 1})
+    local selection_end = vim.fn.min({va.nvim_win_get_cursor(0)[1] + 1, va.nvim_buf_line_count(0)})
+
+    fold_lines(selection_start, selection_end)
+
+    local esc = vim.api.nvim_replace_termcodes('<esc>', true, false, true)
+    vim.api.nvim_feedkeys(esc, 'x', false)
+
 end)
 
-local function remove_last_folds()
-    -- get current position
-    local cur_pos = vim.api.nvim_win_get_cursor(0)
-    local bot_fold = cur_pos[1] + 1
-    local top_fold = cur_pos[1] - 1
-    -- get the marks to remove
-    local marks = prev_marks()
-
-    if marks == nil then
-        print("No folds to remove!")
-        return;
-    end
-
-    local top_mark = vim.api.nvim_get_mark(marks[1], {})
-
-    -- go to top mark
-
-    -- remove fold
-    -- remove top mark
-    -- go to bot mark
-    -- remove fold
-    -- remove bot mark
-    --
-    --
-    -- return to position
-    -- center screen
-end
-vim.keymap.set("n", "<leader>tr", function ()
+M.remove_last_fold = function ()
 
     local cur_pos = va.nvim_win_get_cursor(0)
-    -- get first line
-    --
-    --get last mark
-    local marks = prev_marks()
+    local marks = get_current_and_decrement_fold_marks()
 
     if marks == nil then
         return;
     end
+    -- go to top mark
+    local m1 = getpos("'" .. marks[1])
+    unfold_row({m1[2], 0 })
+    vim.api.nvim_buf_set_mark(0, marks[1], 0, 0, {})
 
-    unfold_row(vim.api.nvim_buf_get_mark(0, marks[1]))
-    -- go to the line of the second mark
-    -- unfold 
-    unfold_row(vim.api.nvim_buf_get_mark(0, marks[2]))
+    local m2 = getpos("'" .. marks[2])
+    unfold_row({m2[2], 0})
+    vim.api.nvim_buf_set_mark(0, marks[2], 0, 0, {})
 
-    -- return to first line
+    -- return to position and center
     va.nvim_win_set_cursor(0, cur_pos)
-end)
-
-local function current_fold ()
-    return M.folds[M.CURRENT_FOLD]
+    vc("norm zz")
 end
 
 
+vim.keymap.set({ "n", "v", "x" }, "<leader>tr", M.remove_last_fold)
 
+M.remove_all_folds = function ()
+    for _=M.CURRENT_FOLD, 0, -1 do
+        M.remove_last_fold()
+    end
+end
 
-vim.keymap.set({"v", "x"}, "<leader>asdf", function()
-
-    local vs_start = vim.fn.getpos("v")[2]
-    local vs_end = vim.fn.getcurpos(0)[2]
-end)
-
+vim.keymap.set({ "n", "v", "x" }, "te", M.remove_all_folds)
 vim.keymap.set("n", "rel", function()
 
-    -- for _, v in pairs(M.folds) do
-    --     for _,m in ipairs(v) do
-    --         vim.api.nvim_del_mark(m)
-    --     end
-    -- end
-
-
     vc(":w")
-    print(vim.inspect(va.nvim_buf_get_mark(0, "a")))
 
     plenary.reload_module("concentrate")
+
     return require("concentrate")
 end)
 
