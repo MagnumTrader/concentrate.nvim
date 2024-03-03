@@ -16,7 +16,6 @@ M.CURRENT_FOLD = 0
 
 -- TODO other settings
 M.setup = function (settings)
-    -- TODO error checking for duplicate marks
     if settings.fold_marks then
         M.fold_marks = settings.fold_marks
     end
