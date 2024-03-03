@@ -1,6 +1,7 @@
 local vc = vim.cmd
 local va = vim.api
 local getpos = vim.fn.getpos
+require("concentrate.dev")
 
 local M = {}
 
@@ -104,6 +105,11 @@ M.remove_last_fold = function ()
     unfold_row({m2[2], 0})
     vim.api.nvim_buf_set_mark(0, marks[2], 0, 0, {})
 
+    if M.CURRENT_FOLD == 0 then
+        -- go to window, remove it
+        va.nvim_win_close(M.TOP_PADDING, true)
+        M.TOP_PADDING = nil
+    end
     -- return to position and center
     va.nvim_win_set_cursor(0, cur_pos)
     vc("norm zz")
@@ -113,21 +119,60 @@ M.remove_all_folds = function ()
     for _=M.CURRENT_FOLD, 0, -1 do
         M.remove_last_fold()
     end
+    -- TODO remove padding windows
 end
 
--- dev only
-local plenary = require("plenary.reload")
-vim.keymap.set("n", "rel", function()
+local function last_fold_marks()
+    return M.fold_marks[M.CURRENT_FOLD]
+end
+local function current_focus_size()
 
-    vc(":w")
+    local last_marks = last_fold_marks()
 
-    plenary.reload_module("concentrate")
+    if last_marks == nil then
+        return
+    end
 
-    return require("concentrate")
+    local top_fold_row = va.nvim_buf_get_mark(0, last_marks[1])[1]
+    local bot_fold_row = va.nvim_buf_get_mark(0, last_marks[2])[1]
+
+    return bot_fold_row - top_fold_row
+
+end
+-- bindings for dev
+vim.keymap.set({ "n", "v", "x" }, "te", function ()
+
+    -- TODO this should be get focus size
+    local cur_win = va.nvim_get_current_win()
+
+    -- get the marks rows
+    -- hsjdfhasdf
+    -- lkjasdflkj
+    -- asdflkj
+    -- asdflkj
+    local win_height = va.nvim_win_get_height(0)
+    local focus_size = current_focus_size()
+
+    if focus_size == nil then
+        print("no focus")
+        return
+    end
+
+    local pad_height = math.floor((win_height - current_focus_size()) / 2)
+    -- create both the windows and pad them
+    -- set these to a column
+    vc("new")
+    M.TOP_PADDING = va.nvim_get_current_win()
+    va.nvim_win_set_height(0, pad_height)
+    va.nvim_set_current_win(cur_win)
 end)
 
--- bindings for dev
-vim.keymap.set({ "n", "v", "x" }, "te", M.new_fold)
+vim.keymap.set("n", "tw" , function ()
+    -- remove windows
+end)
+
+
+vim.keymap.set({ "n", "v", "x" }, "tt", M.new_fold)
 vim.keymap.set({ "n", "v", "x" }, "tr", M.remove_last_fold)
 vim.keymap.set({ "n", "v", "x" }, "<leader>tr", M.remove_all_folds)
 
