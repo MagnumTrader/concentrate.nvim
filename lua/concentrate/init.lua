@@ -4,6 +4,11 @@ local getpos = vim.fn.getpos
 require("concentrate.dev")
 
 local M = {}
+-- should save the settings for folding to restore them
+M.colors = {
+    bg = "#282e26",
+    fg="#282e26"
+}
 
 M.fold_marks = {
     { "j", "k" },
@@ -12,6 +17,7 @@ M.fold_marks = {
     { "y", "o" },
     { "n", "m" },
 }
+
 M.CURRENT_FOLD = 0
 
 -- TODO other settings
@@ -54,11 +60,16 @@ local function add_top_padding ()
     local pad_height = math.floor((win_height - current_focus_size()) / 2)
     -- create both the windows and pad them
     -- set these to a column
-    vc("new")
+    vc("new concentrate.padding")
     M.TOP_PADDING = va.nvim_get_current_win()
     va.nvim_win_set_height(0, pad_height)
     va.nvim_set_current_win(cur_win)
 
+end
+
+local function remove_top_padding()
+    va.nvim_set_current_win(M.TOP_PADDING)
+    va.nvim_buf_delete(0, {force=true})
 end
 local function unfold_row(pos)
     if vim.fn.foldlevel(pos[1]) == 0 then
@@ -130,12 +141,6 @@ M.new_fold =  function()
     end
     local esc = vim.api.nvim_replace_termcodes('<esc>', true, false, true)
     vim.api.nvim_feedkeys(esc, 'x', false)
-    ---
-    --
-    --
-    -- hasdfjkhasdfjh
-    --
-
 end
 
 M.remove_last_fold = function ()
@@ -156,8 +161,7 @@ M.remove_last_fold = function ()
     vim.api.nvim_buf_set_mark(0, marks[2], 0, 0, {})
 
     if M.CURRENT_FOLD == 0 then
-        -- go to window, remove it
-        va.nvim_win_close(M.TOP_PADDING, true)
+        remove_top_padding()
         M.TOP_PADDING = nil
     end
     -- return to position and center
@@ -166,10 +170,10 @@ M.remove_last_fold = function ()
 end
 
 M.remove_all_folds = function ()
+
     for _=M.CURRENT_FOLD, 0, -1 do
         M.remove_last_fold()
     end
-    -- TODO remove padding windows
 end
 
 
